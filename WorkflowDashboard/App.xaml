@@ -1,0 +1,514 @@
+<Application x:Class="WorkflowDashboard.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:WorkflowDashboard">
+  <Application.Resources>
+    <Style TargetType="TextBlock">
+      <Setter Property="FontFamily" Value="Segoe UI"/>
+    </Style>
+    <Style TargetType="Control">
+      <Setter Property="FontFamily" Value="Segoe UI"/>
+    </Style>
+    <!-- v1.0.2 bolder text: popups are their own visual roots (no inheritance from the window's SemiBold). -->
+    <Style TargetType="ToolTip">
+      <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+    <Style TargetType="ContextMenu">
+      <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+    <!-- Defaults; ApplyAccentColor replaces these at runtime -->
+    <SolidColorBrush x:Key="BgBrush" Color="#000000"/>
+    <SolidColorBrush x:Key="PanelBrush" Color="#0A0A0A"/>
+    <SolidColorBrush x:Key="PanelAltBrush" Color="#111111"/>
+    <SolidColorBrush x:Key="BorderBrushQuiet" Color="#2A2A2A"/>
+    <SolidColorBrush x:Key="TextBrush" Color="#FFE566"/>
+    <SolidColorBrush x:Key="MutedTextBrush" Color="#C4B04A"/>
+    <SolidColorBrush x:Key="AccentBrush" Color="#FFE566"/>
+    <SolidColorBrush x:Key="AccentDimBrush" Color="#3D3510"/>
+    <SolidColorBrush x:Key="AccentTextBrush" Color="#000000"/>
+    <SolidColorBrush x:Key="AccentOnDimTextBrush" Color="#FFE566"/>
+    <SolidColorBrush x:Key="DangerBrush" Color="#FFE566"/>
+    <SolidColorBrush x:Key="DangerDimBrush" Color="#1A1808"/>
+    <SolidColorBrush x:Key="SuccessBrush" Color="#7BC47F"/>
+    <SolidColorBrush x:Key="PaperWellBrush" Color="#E8DFC8"/>
+    <SolidColorBrush x:Key="PaperSurfaceBrush" Color="#F3ECD8"/>
+    <SolidColorBrush x:Key="PaperInkBrush" Color="#2A261C"/>
+    <SolidColorBrush x:Key="PaperBorderBrush" Color="#C4B898"/>
+    <SolidColorBrush x:Key="PaperRuleBrush" Color="#C4B898"/>
+    <SolidColorBrush x:Key="PaperMutedBrush" Color="#6A6458"/>
+
+    <!-- Polish layer (defaults; RebuildThemeDerivedVisuals re-derives these from Bg/Accent at runtime) -->
+    <SolidColorBrush x:Key="PanelHighlightBrush" Color="#14FFFFFF"/>
+    <!-- Panel outline: ONE solid color on all four sides (was a top-lit gradient that recolored the top edge). -->
+    <SolidColorBrush x:Key="PanelEdgeBrush" Color="#2A2A2A"/>
+    <LinearGradientBrush x:Key="TitleBarBrush" StartPoint="0,0" EndPoint="0,1">
+      <GradientStop Color="#181818" Offset="0"/>
+      <GradientStop Color="#0C0C0C" Offset="1"/>
+    </LinearGradientBrush>
+    <RadialGradientBrush x:Key="DeskGradientBrush" Center="0.5,0.4" GradientOrigin="0.5,0.35" RadiusX="0.85" RadiusY="0.9">
+      <GradientStop Color="#141410" Offset="0"/>
+      <GradientStop Color="#060606" Offset="0.6"/>
+      <GradientStop Color="#000000" Offset="1"/>
+    </RadialGradientBrush>
+    <LinearGradientBrush x:Key="PaneGradientBrush" StartPoint="0,0" EndPoint="0,1">
+      <GradientStop Color="#0E0E0E" Offset="0"/>
+      <GradientStop Color="#000000" Offset="1"/>
+    </LinearGradientBrush>
+    <SolidColorBrush x:Key="CloseHoverBrush" Color="#C42B1C"/>
+    <SolidColorBrush x:Key="ClosePressedBrush" Color="#8F1F14"/>
+    <!-- GPU (pixel-shader) effects only; applied to empty sibling layers so text keeps ClearType. -->
+    <DropShadowEffect x:Key="PanelShadowEffect" Color="Black" BlurRadius="10" ShadowDepth="2"
+                      Direction="270" Opacity="0.45" RenderingBias="Performance"/>
+    <DropShadowEffect x:Key="AccentGlowEffect" Color="#FFE566" BlurRadius="10" ShadowDepth="0"
+                      Opacity="0.75" RenderingBias="Performance"/>
+    <DropShadowEffect x:Key="DangerGlowEffect" Color="#E81123" BlurRadius="10" ShadowDepth="0"
+                      Opacity="0.8" RenderingBias="Performance"/>
+
+
+    <!-- ===== Keycap buttons (v1.0.1) =====
+         A black mechanical-keyboard keycap, all inside the button's layout box:
+           body  = the key's outer shell: the button's own Background + KeyWallBrush (lighter 1px top rim,
+                   darker tapering side walls, 3px dark skirt at the bottom). It carries the ONLY outline
+                   (BorderBrush, 1px), so there is never a second line around a key.
+           face  = inset top surface (3px in from the sides, 2px from the top, 4px from the bottom), the
+                   button's Background + KeyDishBrush (subtle concave/dished radial shading). No border.
+           shadow= two soft fading layers just below the body (gradient, no Effect).
+         Pressed: the whole key drops 2px, the face sinks 2px further into the shell (skirt 3px -> 1px),
+         the shadow almost disappears and the face darkens. Toggle checked = inverted accent face, latched
+         halfway down. Text has no Effect; the only Effect is the accent hover glow on an empty layer.
+         Key* brushes are re-derived from Bg/Accent in RebuildThemeDerivedVisuals (light/dark strengths). -->
+    <LinearGradientBrush x:Key="KeyWallBrush" StartPoint="0,0" EndPoint="0,1">
+      <GradientStop Color="#40FFFFFF" Offset="0"/>
+      <GradientStop Color="#12FFFFFF" Offset="0.10"/>
+      <GradientStop Color="#33000000" Offset="0.45"/>
+      <GradientStop Color="#99000000" Offset="0.80"/>
+      <GradientStop Color="#C0000000" Offset="1"/>
+    </LinearGradientBrush>
+    <RadialGradientBrush x:Key="KeyDishBrush" Center="0.5,0.42" GradientOrigin="0.5,0.36" RadiusX="0.62" RadiusY="0.85">
+      <GradientStop Color="#22000000" Offset="0"/>
+      <GradientStop Color="#08000000" Offset="0.6"/>
+      <GradientStop Color="#16FFFFFF" Offset="1"/>
+    </RadialGradientBrush>
+    <SolidColorBrush x:Key="KeyPressedSheenBrush" Color="#38000000"/>
+    <LinearGradientBrush x:Key="KeyShadowBrush" StartPoint="0,0" EndPoint="0,1">
+      <GradientStop Color="#B0000000" Offset="0"/>
+      <GradientStop Color="#B0000000" Offset="0.78"/>
+      <GradientStop Color="#00000000" Offset="1"/>
+    </LinearGradientBrush>
+
+    <!-- Tray depth (pane perimeter / dividers via TrayBevelOverlay, side panel edge via TrayEdgeBrush) -->
+    <SolidColorBrush x:Key="TrayShadowBrush" Color="#80000000"/>
+    <SolidColorBrush x:Key="TrayHighlightBrush" Color="#1FFFFFFF"/>
+    <LinearGradientBrush x:Key="TrayEdgeBrush" StartPoint="0,0" EndPoint="0,1">
+      <GradientStop Color="#80000000" Offset="0"/>
+      <GradientStop Color="#0AFFFFFF" Offset="0.5"/>
+      <GradientStop Color="#24FFFFFF" Offset="1"/>
+    </LinearGradientBrush>
+
+    <ControlTemplate x:Key="KeyCapTemplate" TargetType="ButtonBase">
+      <Grid>
+        <!-- Soft drop shadow: two fading layers (no Effect) -->
+        <Border x:Name="shadowFar" CornerRadius="8" Margin="-1,4,-1,-5" IsHitTestVisible="False"
+                Background="{DynamicResource KeyShadowBrush}" Opacity="0.35"/>
+        <Border x:Name="shadowNear" CornerRadius="7" Margin="1,3,1,-3" IsHitTestVisible="False"
+                Background="{DynamicResource KeyShadowBrush}" Opacity="0.75"/>
+        <!-- Accent glow (hover only; collapsed = zero render cost) -->
+        <Border x:Name="glow" CornerRadius="6" IsHitTestVisible="False" Visibility="Collapsed"
+                Background="{DynamicResource AccentDimBrush}" Effect="{DynamicResource AccentGlowEffect}"/>
+        <!-- Body / shell: the single outline -->
+        <Border x:Name="body" CornerRadius="6"
+                Background="{TemplateBinding Background}"
+                BorderBrush="{TemplateBinding BorderBrush}"
+                BorderThickness="{TemplateBinding BorderThickness}">
+          <Border CornerRadius="5" Background="{DynamicResource KeyWallBrush}" IsHitTestVisible="False"/>
+        </Border>
+        <!-- Face: inset, dished, no border -->
+        <Grid x:Name="face" Margin="3,2,3,4">
+          <Border x:Name="faceFill" CornerRadius="4" Background="{TemplateBinding Background}"/>
+          <Border x:Name="dish" CornerRadius="4" IsHitTestVisible="False" Background="{DynamicResource KeyDishBrush}"/>
+          <Border x:Name="press" CornerRadius="4" IsHitTestVisible="False" Visibility="Collapsed"
+                  Background="{DynamicResource KeyPressedSheenBrush}"/>
+          <Border Padding="{TemplateBinding Padding}">
+            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                              RecognizesAccessKey="True"/>
+          </Border>
+        </Grid>
+      </Grid>
+      <ControlTemplate.Triggers>
+        <Trigger Property="ToggleButton.IsChecked" Value="True">
+          <Setter TargetName="body" Property="Background" Value="{DynamicResource AccentDimBrush}"/>
+          <Setter TargetName="body" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+          <Setter TargetName="faceFill" Property="Background" Value="{DynamicResource AccentDimBrush}"/>
+          <Setter Property="Foreground" Value="{DynamicResource AccentOnDimTextBrush}"/>
+          <Setter TargetName="body" Property="Margin" Value="0,1,0,0"/>
+          <Setter TargetName="glow" Property="Margin" Value="0,1,0,0"/>
+          <Setter TargetName="face" Property="Margin" Value="3,3,3,3"/>
+          <Setter TargetName="shadowFar" Property="Visibility" Value="Collapsed"/>
+          <Setter TargetName="shadowNear" Property="Opacity" Value="0.5"/>
+        </Trigger>
+        <Trigger Property="IsMouseOver" Value="True">
+          <Setter TargetName="glow" Property="Visibility" Value="Visible"/>
+          <Setter TargetName="body" Property="Background" Value="{DynamicResource AccentDimBrush}"/>
+          <Setter TargetName="body" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+          <Setter TargetName="faceFill" Property="Background" Value="{DynamicResource AccentDimBrush}"/>
+          <Setter Property="Foreground" Value="{DynamicResource AccentOnDimTextBrush}"/>
+        </Trigger>
+        <!-- Lit (inverted accent) keys keep their own face on hover: only glow + accent edge -->
+        <MultiTrigger>
+          <MultiTrigger.Conditions>
+            <Condition Property="IsMouseOver" Value="True"/>
+            <Condition Property="local:KeyCap.Lit" Value="True"/>
+          </MultiTrigger.Conditions>
+          <Setter TargetName="body" Property="Background" Value="{Binding Background, RelativeSource={RelativeSource TemplatedParent}}"/>
+          <Setter TargetName="faceFill" Property="Background" Value="{Binding Background, RelativeSource={RelativeSource TemplatedParent}}"/>
+        </MultiTrigger>
+        <!-- Unselected tab: recessed (sunk, no shadow); selected tab (Lit) stands up as a full keycap -->
+        <MultiTrigger>
+          <MultiTrigger.Conditions>
+            <Condition Property="local:KeyCap.Recessed" Value="True"/>
+            <Condition Property="local:KeyCap.Lit" Value="False"/>
+          </MultiTrigger.Conditions>
+          <Setter TargetName="body" Property="Margin" Value="0,2,0,0"/>
+          <Setter TargetName="glow" Property="Margin" Value="0,2,0,0"/>
+          <Setter TargetName="face" Property="Margin" Value="3,4,3,2"/>
+          <Setter TargetName="shadowFar" Property="Visibility" Value="Collapsed"/>
+          <Setter TargetName="shadowNear" Property="Opacity" Value="0.15"/>
+          <Setter TargetName="press" Property="Visibility" Value="Visible"/>
+        </MultiTrigger>
+        <Trigger Property="IsPressed" Value="True">
+          <Setter TargetName="body" Property="Margin" Value="0,2,0,0"/>
+          <Setter TargetName="glow" Property="Margin" Value="0,2,0,0"/>
+          <Setter TargetName="face" Property="Margin" Value="3,4,3,2"/>
+          <Setter TargetName="shadowFar" Property="Visibility" Value="Collapsed"/>
+          <Setter TargetName="shadowNear" Property="Opacity" Value="0.15"/>
+          <Setter TargetName="press" Property="Visibility" Value="Visible"/>
+        </Trigger>
+        <Trigger Property="IsEnabled" Value="False">
+          <Setter Property="Opacity" Value="0.45"/>
+        </Trigger>
+      </ControlTemplate.Triggers>
+    </ControlTemplate>
+
+    <Style TargetType="Button">
+      <Setter Property="Background" Value="{DynamicResource PanelAltBrush}"/>
+      <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource BorderBrushQuiet}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="Padding" Value="10,4"/>
+      <Setter Property="Margin" Value="0,0,6,0"/>
+      <Setter Property="FontSize" Value="12"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="HorizontalContentAlignment" Value="Center"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
+      <Setter Property="SnapsToDevicePixels" Value="True"/>
+      <Setter Property="Template" Value="{StaticResource KeyCapTemplate}"/>
+    </Style>
+
+    <!-- Toggle keycap: same key; checked = inverted accent face, latched halfway down -->
+    <Style x:Key="QuietToggle" TargetType="ToggleButton">
+      <Setter Property="Background" Value="{DynamicResource PanelAltBrush}"/>
+      <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource BorderBrushQuiet}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="Padding" Value="8,3"/>
+      <Setter Property="Margin" Value="0,0,4,0"/>
+      <Setter Property="FontSize" Value="11"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="HorizontalContentAlignment" Value="Center"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
+      <Setter Property="SnapsToDevicePixels" Value="True"/>
+      <Setter Property="Template" Value="{StaticResource KeyCapTemplate}"/>
+    </Style>
+
+    <!-- ===== Subtle themed scrollbars (v1.0.2) =====
+         App-wide implicit ScrollBar style (Windows / Docs / Media lists, Files list + preview text in the Docs overlay).
+         No visible track. Idle: 4 px neutral-grey thumb at 30 %. Pointer over the list: thumb fades to 55 %.
+         Pointer over the bar: thumb widens to 8 px and turns accent; accent while dragging. Short fades.
+         The bar reserves a fixed 10 px lane so nothing reflows on hover. No arrow buttons (page clicks still work).
+         Accent is a DynamicResource, so every theme / accent re-tints it live. -->
+    <Style x:Key="SlimScrollPage" TargetType="RepeatButton">
+      <Setter Property="OverridesDefaultStyle" Value="True"/>
+      <Setter Property="IsTabStop" Value="False"/>
+      <Setter Property="Focusable" Value="False"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="RepeatButton">
+            <Border Background="Transparent"/>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style x:Key="SlimScrollThumbV" TargetType="Thumb">
+      <Setter Property="OverridesDefaultStyle" Value="True"/>
+      <Setter Property="IsTabStop" Value="False"/>
+      <Setter Property="Focusable" Value="False"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Thumb">
+            <Grid Background="Transparent">
+              <Grid x:Name="Pill" Width="4" HorizontalAlignment="Right" Margin="0,2,1,2">
+                <Border x:Name="GreyFill" CornerRadius="2" Background="#FF8C8C8C" Opacity="0.3"/>
+                <Border x:Name="AccentFill" CornerRadius="2" Background="{DynamicResource AccentBrush}" Opacity="0"/>
+              </Grid>
+            </Grid>
+            <ControlTemplate.Triggers>
+              <!-- Pointer over the list / pane: fade the grey thumb in a little. -->
+              <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ScrollViewer}}" Value="True">
+                <DataTrigger.EnterActions>
+                  <BeginStoryboard>
+                    <Storyboard>
+                      <DoubleAnimation Storyboard.TargetName="GreyFill" Storyboard.TargetProperty="Opacity" To="0.55" Duration="0:0:0.15"/>
+                    </Storyboard>
+                  </BeginStoryboard>
+                </DataTrigger.EnterActions>
+                <DataTrigger.ExitActions>
+                  <BeginStoryboard>
+                    <Storyboard>
+                      <DoubleAnimation Storyboard.TargetName="GreyFill" Storyboard.TargetProperty="Opacity" To="0.3" Duration="0:0:0.25"/>
+                    </Storyboard>
+                  </BeginStoryboard>
+                </DataTrigger.ExitActions>
+              </DataTrigger>
+              <!-- Pointer over the bar itself (and while dragging: the thumb holds mouse capture, so the bar stays
+                   "over"): widen to 8 px and switch to the accent color. -->
+              <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ScrollBar}}" Value="True">
+                <DataTrigger.EnterActions>
+                  <BeginStoryboard>
+                    <Storyboard>
+                      <DoubleAnimation Storyboard.TargetName="Pill" Storyboard.TargetProperty="Width" To="8" Duration="0:0:0.12"/>
+                      <DoubleAnimation Storyboard.TargetName="AccentFill" Storyboard.TargetProperty="Opacity" To="0.8" Duration="0:0:0.12"/>
+                    </Storyboard>
+                  </BeginStoryboard>
+                </DataTrigger.EnterActions>
+                <DataTrigger.ExitActions>
+                  <BeginStoryboard>
+                    <Storyboard>
+                      <DoubleAnimation Storyboard.TargetName="Pill" Storyboard.TargetProperty="Width" To="4" Duration="0:0:0.2"/>
+                      <DoubleAnimation Storyboard.TargetName="AccentFill" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.2"/>
+                    </Storyboard>
+                  </BeginStoryboard>
+                </DataTrigger.ExitActions>
+              </DataTrigger>
+              <Trigger Property="IsDragging" Value="True">
+                <Setter TargetName="GreyFill" Property="Background" Value="{DynamicResource AccentBrush}"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style x:Key="SlimScrollThumbH" TargetType="Thumb">
+      <Setter Property="OverridesDefaultStyle" Value="True"/>
+      <Setter Property="IsTabStop" Value="False"/>
+      <Setter Property="Focusable" Value="False"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Thumb">
+            <Grid Background="Transparent">
+              <Grid x:Name="Pill" Height="4" VerticalAlignment="Bottom" Margin="2,0,2,1">
+                <Border x:Name="GreyFill" CornerRadius="2" Background="#FF8C8C8C" Opacity="0.3"/>
+                <Border x:Name="AccentFill" CornerRadius="2" Background="{DynamicResource AccentBrush}" Opacity="0"/>
+              </Grid>
+            </Grid>
+            <ControlTemplate.Triggers>
+              <!-- Pointer over the list / pane: fade the grey thumb in a little. -->
+              <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ScrollViewer}}" Value="True">
+                <DataTrigger.EnterActions>
+                  <BeginStoryboard>
+                    <Storyboard>
+                      <DoubleAnimation Storyboard.TargetName="GreyFill" Storyboard.TargetProperty="Opacity" To="0.55" Duration="0:0:0.15"/>
+                    </Storyboard>
+                  </BeginStoryboard>
+                </DataTrigger.EnterActions>
+                <DataTrigger.ExitActions>
+                  <BeginStoryboard>
+                    <Storyboard>
+                      <DoubleAnimation Storyboard.TargetName="GreyFill" Storyboard.TargetProperty="Opacity" To="0.3" Duration="0:0:0.25"/>
+                    </Storyboard>
+                  </BeginStoryboard>
+                </DataTrigger.ExitActions>
+              </DataTrigger>
+              <!-- Pointer over the bar itself (and while dragging: the thumb holds mouse capture, so the bar stays
+                   "over"): widen to 8 px and switch to the accent color. -->
+              <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ScrollBar}}" Value="True">
+                <DataTrigger.EnterActions>
+                  <BeginStoryboard>
+                    <Storyboard>
+                      <DoubleAnimation Storyboard.TargetName="Pill" Storyboard.TargetProperty="Height" To="8" Duration="0:0:0.12"/>
+                      <DoubleAnimation Storyboard.TargetName="AccentFill" Storyboard.TargetProperty="Opacity" To="0.8" Duration="0:0:0.12"/>
+                    </Storyboard>
+                  </BeginStoryboard>
+                </DataTrigger.EnterActions>
+                <DataTrigger.ExitActions>
+                  <BeginStoryboard>
+                    <Storyboard>
+                      <DoubleAnimation Storyboard.TargetName="Pill" Storyboard.TargetProperty="Height" To="4" Duration="0:0:0.2"/>
+                      <DoubleAnimation Storyboard.TargetName="AccentFill" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.2"/>
+                    </Storyboard>
+                  </BeginStoryboard>
+                </DataTrigger.ExitActions>
+              </DataTrigger>
+              <Trigger Property="IsDragging" Value="True">
+                <Setter TargetName="GreyFill" Property="Background" Value="{DynamicResource AccentBrush}"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <ControlTemplate x:Key="SlimVerticalScrollBar" TargetType="ScrollBar">
+      <Grid Background="Transparent" SnapsToDevicePixels="True">
+        <Track x:Name="PART_Track" IsDirectionReversed="True">
+          <Track.DecreaseRepeatButton>
+            <RepeatButton Style="{StaticResource SlimScrollPage}" Command="ScrollBar.PageUpCommand"/>
+          </Track.DecreaseRepeatButton>
+          <Track.Thumb>
+            <Thumb Style="{StaticResource SlimScrollThumbV}"/>
+          </Track.Thumb>
+          <Track.IncreaseRepeatButton>
+            <RepeatButton Style="{StaticResource SlimScrollPage}" Command="ScrollBar.PageDownCommand"/>
+          </Track.IncreaseRepeatButton>
+        </Track>
+      </Grid>
+    </ControlTemplate>
+    <ControlTemplate x:Key="SlimHorizontalScrollBar" TargetType="ScrollBar">
+      <Grid Background="Transparent" SnapsToDevicePixels="True">
+        <Track x:Name="PART_Track" IsDirectionReversed="False">
+          <Track.DecreaseRepeatButton>
+            <RepeatButton Style="{StaticResource SlimScrollPage}" Command="ScrollBar.PageLeftCommand"/>
+          </Track.DecreaseRepeatButton>
+          <Track.Thumb>
+            <Thumb Style="{StaticResource SlimScrollThumbH}"/>
+          </Track.Thumb>
+          <Track.IncreaseRepeatButton>
+            <RepeatButton Style="{StaticResource SlimScrollPage}" Command="ScrollBar.PageRightCommand"/>
+          </Track.IncreaseRepeatButton>
+        </Track>
+      </Grid>
+    </ControlTemplate>
+    <Style TargetType="ScrollBar">
+      <Setter Property="OverridesDefaultStyle" Value="True"/>
+      <Setter Property="SnapsToDevicePixels" Value="True"/>
+      <Setter Property="Stylus.IsFlicksEnabled" Value="False"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="Width" Value="10"/>
+      <Setter Property="MinWidth" Value="10"/>
+      <Setter Property="Height" Value="Auto"/>
+      <Setter Property="Template" Value="{StaticResource SlimVerticalScrollBar}"/>
+      <Style.Triggers>
+        <Trigger Property="Orientation" Value="Horizontal">
+          <Setter Property="Width" Value="Auto"/>
+          <Setter Property="MinWidth" Value="0"/>
+          <Setter Property="Height" Value="10"/>
+          <Setter Property="MinHeight" Value="10"/>
+          <Setter Property="Template" Value="{StaticResource SlimHorizontalScrollBar}"/>
+        </Trigger>
+      </Style.Triggers>
+    </Style>
+
+    <!-- ===== Section header strips (v1.0.1) =====
+         Side panel section labels sit on a slightly raised strip that bleeds to the card edges (negative margin
+         = the card's padding, set per use): top-light / bottom-dark gradient (HeaderStripBrush), a faint 1px top
+         highlight inside the card's single outline, and a 1px shadow + 1px light groove at the bottom that ties
+         into the tray borders. No outline of its own. SemiBold label, theme-derived colors. -->
+    <LinearGradientBrush x:Key="HeaderStripBrush" StartPoint="0,0" EndPoint="0,1">
+      <GradientStop Color="#16FFFFFF" Offset="0"/>
+      <GradientStop Color="#06FFFFFF" Offset="0.55"/>
+      <GradientStop Color="#1A000000" Offset="1"/>
+    </LinearGradientBrush>
+    <SolidColorBrush x:Key="HeaderTopHiBrush" Color="#1CFFFFFF"/>
+    <Style x:Key="SectionHeaderStrip" TargetType="ContentControl">
+      <Setter Property="Focusable" Value="False"/>
+      <Setter Property="IsTabStop" Value="False"/>
+      <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}"/>
+      <Setter Property="FontSize" Value="11"/>
+      <Setter Property="FontWeight" Value="Bold"/>
+      <Setter Property="Padding" Value="8,5,8,6"/>
+      <Setter Property="SnapsToDevicePixels" Value="True"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ContentControl">
+            <Grid>
+              <Border CornerRadius="5,5,0,0" Background="{DynamicResource HeaderStripBrush}"/>
+              <Border Height="1" VerticalAlignment="Top" Margin="5,0,5,0" IsHitTestVisible="False"
+                      Background="{DynamicResource HeaderTopHiBrush}"/>
+              <Border Height="1" VerticalAlignment="Bottom" Margin="0,0,0,1" IsHitTestVisible="False"
+                      Background="{DynamicResource TrayShadowBrush}"/>
+              <Border Height="1" VerticalAlignment="Bottom" IsHitTestVisible="False"
+                      Background="{DynamicResource TrayHighlightBrush}"/>
+              <ContentPresenter Margin="{TemplateBinding Padding}" VerticalAlignment="Center"
+                                TextBlock.FontWeight="{TemplateBinding FontWeight}"/>
+            </Grid>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <!-- Custom title bar caption buttons (min / max-restore / close). Close uses Tag="close" for red hover. -->
+    <Style x:Key="TitleBarButton" TargetType="Button">
+      <Setter Property="Width" Value="46"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Margin" Value="0"/>
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="Focusable" Value="False"/>
+      <Setter Property="IsTabStop" Value="False"/>
+      <Setter Property="VerticalAlignment" Value="Stretch"/>
+      <Setter Property="WindowChrome.IsHitTestVisibleInChrome" Value="True"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Grid>
+              <Border x:Name="glow" IsHitTestVisible="False" Visibility="Collapsed" Margin="4,5"
+                      Background="{DynamicResource AccentDimBrush}" Effect="{DynamicResource AccentGlowEffect}"/>
+              <Border x:Name="bd" Background="{TemplateBinding Background}" SnapsToDevicePixels="True">
+                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                                  TextElement.Foreground="{TemplateBinding Foreground}"/>
+              </Border>
+            </Grid>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="glow" Property="Visibility" Value="Visible"/>
+                <Setter TargetName="bd" Property="Background" Value="{DynamicResource AccentDimBrush}"/>
+                <Setter Property="Foreground" Value="{DynamicResource AccentOnDimTextBrush}"/>
+              </Trigger>
+              <Trigger Property="IsPressed" Value="True">
+                <Setter TargetName="bd" Property="Background" Value="{DynamicResource AccentBrush}"/>
+                <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}"/>
+              </Trigger>
+              <MultiTrigger>
+                <MultiTrigger.Conditions>
+                  <Condition Property="IsMouseOver" Value="True"/>
+                  <Condition Property="Tag" Value="close"/>
+                </MultiTrigger.Conditions>
+                <Setter TargetName="bd" Property="Background" Value="{DynamicResource CloseHoverBrush}"/>
+                <Setter TargetName="glow" Property="Background" Value="{DynamicResource CloseHoverBrush}"/>
+                <Setter TargetName="glow" Property="Effect" Value="{DynamicResource DangerGlowEffect}"/>
+                <Setter Property="Foreground" Value="White"/>
+              </MultiTrigger>
+              <MultiTrigger>
+                <MultiTrigger.Conditions>
+                  <Condition Property="IsPressed" Value="True"/>
+                  <Condition Property="Tag" Value="close"/>
+                </MultiTrigger.Conditions>
+                <Setter TargetName="bd" Property="Background" Value="{DynamicResource ClosePressedBrush}"/>
+                <Setter Property="Foreground" Value="White"/>
+              </MultiTrigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <!-- Hover glow for Border-based chips (link chips in the Windows list) -->
+    <Style x:Key="GlowChipBorder" TargetType="Border">
+      <Style.Triggers>
+        <Trigger Property="IsMouseOver" Value="True">
+          <Setter Property="Effect" Value="{DynamicResource AccentGlowEffect}"/>
+        </Trigger>
+      </Style.Triggers>
+    </Style>
+  </Application.Resources>
+</Application>

@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>WorkflowDashboard</RootNamespace>
+    <AssemblyName>TilerSmoke</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\WorkflowDashboard\WindowTiler.cs" Link="WindowTiler.cs" />
+    <Compile Include="..\WorkflowDashboard\ZoneLayout.cs" Link="ZoneLayout.cs" />
+  </ItemGroup>
+</Project>

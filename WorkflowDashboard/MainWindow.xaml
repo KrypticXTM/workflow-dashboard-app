@@ -1,0 +1,748 @@
+<Window x:Class="WorkflowDashboard.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:WorkflowDashboard"
+        Title="Workflow Dashboard"
+        Height="780" Width="1280"
+        MinHeight="560" MinWidth="980"
+        WindowStartupLocation="Manual" Left="0" Top="0"
+        Background="{DynamicResource BgBrush}"
+        Foreground="{DynamicResource TextBrush}"
+        FontFamily="Segoe UI"
+        FontWeight="SemiBold"
+        ResizeMode="CanResizeWithGrip"
+        WindowStyle="SingleBorderWindow"
+        ShowInTaskbar="True"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
+        Topmost="False">
+  <!-- Frameless: client area covers the whole window. Caption drag / double-click / Aero Snap / system menu
+       come from WindowChrome; resize borders stay. CaptionHeight is re-synced in code (UpdateMaximizedChromePadding)
+       so the drag region always equals the visible custom title bar (also when maximized). -->
+  <WindowChrome.WindowChrome>
+    <WindowChrome CaptionHeight="26" ResizeBorderThickness="6" GlassFrameThickness="0,0,0,1"
+                  CornerRadius="0" UseAeroCaptionButtons="False" NonClientFrameEdges="None"/>
+  </WindowChrome.WindowChrome>
+  <Grid x:Name="WindowRoot">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="*"/>
+    </Grid.RowDefinitions>
+
+  <!-- Custom title bar (theme brushes only). Shadow lives on an empty sibling layer so text keeps ClearType. -->
+  <Grid x:Name="TitleBarHost" Grid.Row="0" Height="32" Panel.ZIndex="10">
+    <Border IsHitTestVisible="False" Background="{DynamicResource PanelBrush}"
+            Effect="{DynamicResource PanelShadowEffect}"/>
+    <Border x:Name="TitleBar" Background="{DynamicResource TitleBarBrush}"
+            BorderBrush="{DynamicResource BorderBrushQuiet}" BorderThickness="0,0,0,1">
+      <Grid>
+        <DockPanel LastChildFill="True">
+          <StackPanel x:Name="CaptionButtons" DockPanel.Dock="Right" Orientation="Horizontal">
+            <!-- Vector glyphs (font-independent: the app-wide implicit TextBlock style forces Segoe UI). -->
+            <Button x:Name="BtnTitleMin" Style="{StaticResource TitleBarButton}" Click="BtnTitleMin_Click" ToolTip="Minimize">
+              <Path Width="10" Height="10" Data="M0,5.5 L10,5.5" StrokeThickness="1" SnapsToDevicePixels="True"
+                    Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+            </Button>
+            <Button x:Name="BtnTitleMax" Style="{StaticResource TitleBarButton}" Click="BtnTitleMax_Click" ToolTip="Maximize">
+              <Grid Width="10" Height="10">
+                <Path x:Name="MaxGlyph" Data="M0.5,0.5 H9.5 V9.5 H0.5 Z" StrokeThickness="1" SnapsToDevicePixels="True"
+                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                <Path x:Name="RestoreGlyph" Visibility="Collapsed" StrokeThickness="1" SnapsToDevicePixels="True"
+                      Data="M2.5,2.5 V0.5 H9.5 V7.5 H7.5 M0.5,2.5 H7.5 V9.5 H0.5 Z"
+                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+              </Grid>
+            </Button>
+            <Button x:Name="BtnTitleClose" Style="{StaticResource TitleBarButton}" Tag="close" Click="BtnTitleClose_Click" ToolTip="Close">
+              <Path Width="10" Height="10" Data="M0,0 L10,10 M10,0 L0,10" StrokeThickness="1.1"
+                    Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+            </Button>
+          </StackPanel>
+          <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0" IsHitTestVisible="False">
+            <Border Width="10" Height="10" CornerRadius="3" Margin="0,0,10,0" VerticalAlignment="Center"
+                    Background="{DynamicResource AccentBrush}" Effect="{DynamicResource AccentGlowEffect}"/>
+            <TextBlock Text="Workflow Dashboard" FontSize="12" FontWeight="Bold" VerticalAlignment="Center"
+                       Foreground="{DynamicResource TextBrush}"/>
+            <TextBlock x:Name="TxtTitleVersion" FontSize="11" VerticalAlignment="Center" Margin="8,1,0,0"
+                       Foreground="{DynamicResource MutedTextBrush}"/>
+            <TextBlock Text="-  contained desk" FontSize="11" VerticalAlignment="Center" Margin="10,1,0,0"
+                       Foreground="{DynamicResource MutedTextBrush}"/>
+          </StackPanel>
+        </DockPanel>
+      </Grid>
+    </Border>
+  </Grid>
+
+  <DockPanel x:Name="RootDock" Grid.Row="1" Margin="6">
+
+    <!-- Header + optional in-desk color strip (no ContextMenu) -->
+    <StackPanel x:Name="TopChrome" DockPanel.Dock="Top" Margin="0,0,0,6">
+    <!-- v1.0.1 responsive header: UpdateHeaderResponsive() picks centered / left-aligned / compact (group
+         labels hidden) / two-row, and both groups are WrapPanels capped at the header width, so the
+         toolbar buttons never overlap at any window width or UI zoom. Group containers are fill-only
+         (transparent edge) so a key's own outline is the only line around it. -->
+    <Grid x:Name="HeaderChrome" MinHeight="36" SizeChanged="HeaderChrome_SizeChanged">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="Auto"/>
+      </Grid.RowDefinitions>
+      <!-- App title moved into the custom title bar. -->
+
+      <!-- Centered layout / pane controls -->
+      <Grid x:Name="HeaderCenterGroup" HorizontalAlignment="Center" VerticalAlignment="Center">
+      <Border IsHitTestVisible="False" CornerRadius="6" Background="{DynamicResource PanelAltBrush}"
+              Effect="{DynamicResource PanelShadowEffect}"/>
+      <Border Background="{DynamicResource PanelAltBrush}" CornerRadius="6"
+              BorderBrush="Transparent" BorderThickness="1"
+              Padding="8,3">
+        <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
+          <TextBlock x:Name="TxtHdrPanes" Text="Panes" Foreground="{DynamicResource MutedTextBrush}"
+                     FontSize="11" VerticalAlignment="Center" Margin="0,0,6,0"/>
+          <ToggleButton x:Name="TbPane1" Content="1" Width="28" Style="{StaticResource QuietToggle}" Click="PaneCount_Click" Tag="1"/>
+          <ToggleButton x:Name="TbPane2" Content="2" Width="28" Style="{StaticResource QuietToggle}" Click="PaneCount_Click" Tag="2"/>
+          <ToggleButton x:Name="TbPane3" Content="3" Width="28" Style="{StaticResource QuietToggle}" Click="PaneCount_Click" Tag="3"/>
+          <Border Width="1" Background="{DynamicResource BorderBrushQuiet}" Margin="8,2,8,2"/>
+          <TextBlock x:Name="TxtHdrLayout" Text="Layout" Foreground="{DynamicResource MutedTextBrush}"
+                     FontSize="11" VerticalAlignment="Center" Margin="0,0,6,0"/>
+          <ToggleButton x:Name="TbLayoutEqual" Content="Equal" Style="{StaticResource QuietToggle}"
+                        Click="Layout_Click" Tag="equal" Padding="10,4"/>
+          <ToggleButton x:Name="TbLayoutMain" Content="Main" Style="{StaticResource QuietToggle}"
+                        Click="Layout_Click" Tag="main" Padding="10,4"/>
+          <ToggleButton x:Name="TbLayoutLarge" Content="Large" Style="{StaticResource QuietToggle}"
+                        Click="Layout_Click" Tag="large" Padding="10,4"/>
+          <Border Width="1" Background="{DynamicResource BorderBrushQuiet}" Margin="8,2,8,2"/>
+          <Button x:Name="BtnExpandPane" Content="Expand" Click="BtnExpandPane_Click"
+                  ToolTip="Expand active pane to dominate the desk (remembers prior layout)"
+                  Padding="10,4" Margin="0,0,4,0" FontSize="11"/>
+          <Button x:Name="BtnBackLayout" Content="Back to layout" Click="BtnBackLayout_Click"
+                  ToolTip="Restore previous pane count + layout"
+                  Padding="10,4" Margin="0,0,4,0" FontSize="11" IsEnabled="False"/>
+          <Border Width="1" Background="{DynamicResource BorderBrushQuiet}" Margin="4,2,8,2"/>
+          <ToggleButton x:Name="TbLiveDesk" Content="Live" Style="{StaticResource QuietToggle}"
+                        Click="LiveDesk_Click" Padding="10,4" IsChecked="True"
+                        ToolTip="Live desk: tile real windows into pane geometry. Off = thumbnail preview only."/>
+          <Border Width="1" Background="{DynamicResource BorderBrushQuiet}" Margin="8,2,8,2"/>
+          <ToggleButton x:Name="TbFlip" Content="Flip" Style="{StaticResource QuietToggle}"
+                        Click="Flip_Click" Padding="10,4"
+                        ToolTip="Mirror thin/main side for 2-pane Main/Large (persisted). 3-pane Main/Large stay center-stage."/>
+        </WrapPanel>
+      </Border>
+      </Grid>
+
+      <WrapPanel x:Name="HeaderRightGroup" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center"
+                 SizeChanged="HeaderRightGroup_SizeChanged">
+        <Grid Margin="0,0,8,0" VerticalAlignment="Center">
+        <Border IsHitTestVisible="False" CornerRadius="6" Background="{DynamicResource PanelAltBrush}"
+                Effect="{DynamicResource PanelShadowEffect}"/>
+        <Border Background="{DynamicResource PanelAltBrush}" CornerRadius="6"
+                BorderBrush="Transparent" BorderThickness="1"
+                Padding="6,3">
+          <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+            <TextBlock x:Name="TxtHdrSize" Text="Size" Foreground="{DynamicResource MutedTextBrush}"
+                       FontSize="11" VerticalAlignment="Center" Margin="0,0,4,0"/>
+            <ToggleButton x:Name="TbSizeFull" Content="Full" Style="{StaticResource QuietToggle}"
+                          Click="SizePreset_Click" Tag="full" Padding="8,4" Margin="0,0,2,0"
+                          ToolTip="Maximize / fill monitor work area"/>
+            <ToggleButton x:Name="TbSize90" Content="90%" Style="{StaticResource QuietToggle}"
+                          Click="SizePreset_Click" Tag="90" Padding="8,4" Margin="0,0,2,0"
+                          ToolTip="90% of work area, centered"/>
+            <ToggleButton x:Name="TbSize80" Content="80%" Style="{StaticResource QuietToggle}"
+                          Click="SizePreset_Click" Tag="80" Padding="8,4" Margin="0,0,2,0"
+                          ToolTip="80% of work area, centered"/>
+            <ToggleButton x:Name="TbSize70" Content="70%" Style="{StaticResource QuietToggle}"
+                          Click="SizePreset_Click" Tag="70" Padding="8,4" Margin="0,0,2,0"
+                          ToolTip="70% of work area, centered"/>
+            <ToggleButton x:Name="TbLockHeight" Content="Lock H" Style="{StaticResource QuietToggle}"
+                          Click="LockHeight_Click" Padding="8,4" Margin="0,0,0,0"
+                          ToolTip="Lock height: keep Height and Top fixed. 90%/80% then change width only. First ON applies work-area full height."/>
+          </StackPanel>
+        </Border>
+        </Grid>
+        <Button x:Name="BtnZoomOut" Content="-" Width="28" Padding="4,4" FontSize="14" FontWeight="Bold"
+                Click="ZoomOut_Click" ToolTip="UI zoom out (desk chrome only - linked apps resize with the Dashboard window)" Margin="0,0,2,0" VerticalAlignment="Center"/>
+        <Button x:Name="BtnZoomLabel" Content="100%" MinWidth="48" Padding="6,4" FontSize="11"
+                Click="ZoomReset_Click" ToolTip="Reset UI zoom to 100% (not app content zoom)" Margin="0,0,2,0" VerticalAlignment="Center"/>
+        <Button x:Name="BtnZoomIn" Content="+" Width="28" Padding="4,4" FontSize="14" FontWeight="Bold"
+                Click="ZoomIn_Click" ToolTip="UI zoom in (desk chrome only - linked apps resize with the Dashboard window)" Margin="0,0,8,0" VerticalAlignment="Center"/>
+        <Button x:Name="BtnAccentColor" Content="Color" Click="BtnAccentColor_Click"
+                ToolTip="Show / hide the in-desk accent strip"
+                Padding="8,4" FontSize="11" Margin="0,0,6,0" VerticalAlignment="Center"/>
+        <Button x:Name="BtnFocusDesk" Content="Full screen" Click="BtnFocusDesk_Click"
+                ToolTip="Hide header + side panel for a full-screen desk (Esc / Ctrl+Shift+D / Show UI to restore)"
+                Padding="8,4" FontSize="11" Margin="0,0,6,0" VerticalAlignment="Center"/>
+        <Button x:Name="BtnToggleSide"
+                Content="Collapse" Click="BtnToggleSide_Click"
+                ToolTip="Collapse / expand the Windows + media side panel"
+                Padding="8,4" FontSize="11" Margin="0" VerticalAlignment="Center"/>
+      </WrapPanel>
+      <!-- v1.0.2: the color strip OVERLAYS the header (row 0, left of the right-hand group) instead of
+           pushing the desk down, so opening it does not change pane geometry (no retile, no blank panes).
+           Margin/row are set in code from the header's current responsive mode. -->
+      <Grid x:Name="ColorStripLayer" Grid.Row="0" Panel.ZIndex="20" VerticalAlignment="Stretch"
+            Visibility="{Binding Visibility, ElementName=ColorStrip}">
+      <Border IsHitTestVisible="False" CornerRadius="6" Background="{DynamicResource PanelAltBrush}"
+              Effect="{DynamicResource PanelShadowEffect}"
+              Visibility="{Binding Visibility, ElementName=ColorStrip}"
+              Margin="{Binding Margin, ElementName=ColorStrip}"/>
+      <Border x:Name="ColorStrip" Visibility="Collapsed" Margin="0" Padding="8,3"
+              Background="{DynamicResource PanelAltBrush}" CornerRadius="6"
+              BorderBrush="Transparent" BorderThickness="1">
+        <DockPanel>
+          <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,0,0">
+            <Button x:Name="BtnAccentUseDefault" Content="Default" Click="BtnAccentUseDefault_Click"
+                    ToolTip="Apply saved default accent + background" Padding="8,3" FontSize="11" Margin="0,0,4,0"/>
+            <Button x:Name="BtnAccentSetDefault" Content="Set default" Click="BtnAccentSetDefault_Click"
+                    ToolTip="Save current accent + background as default" Padding="8,3" FontSize="11"/>
+          </StackPanel>
+          <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
+            <TextBlock Text="Accent" VerticalAlignment="Center"
+                       Foreground="{DynamicResource MutedTextBrush}" FontSize="11" Margin="0,0,8,0"/>
+            <StackPanel x:Name="ColorStripHost" Orientation="Horizontal" VerticalAlignment="Center"/>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+              <Border Width="1" Background="{DynamicResource BorderBrushQuiet}" Margin="10,2,10,2"/>
+              <TextBlock Text="Bg" VerticalAlignment="Center"
+                         Foreground="{DynamicResource MutedTextBrush}" FontSize="11" Margin="0,0,8,0"/>
+              <StackPanel x:Name="BgStripHost" Orientation="Horizontal" VerticalAlignment="Center"/>
+            </StackPanel>
+          </WrapPanel>
+        </DockPanel>
+      </Border>
+      </Grid>
+    </Grid>
+
+    </StackPanel>
+
+    <!-- Status + actions -->
+    <!-- Actions removed: Assign/Unlink/Focus/Park/Refresh â€” use sidebar chips / Unlink drop. Status only. -->
+    <!-- Status bar: no separator line (it stacked 6px under the desk/side panel edges = double line). -->
+    <Border x:Name="BottomChrome" DockPanel.Dock="Bottom" Margin="0,2,0,0" Padding="0,1,0,0"
+            BorderBrush="Transparent" BorderThickness="0,1,0,0">
+      <DockPanel>
+        <TextBlock x:Name="StatusText"
+                   Foreground="{DynamicResource MutedTextBrush}"
+                   FontSize="11" Margin="0" VerticalAlignment="Center" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" Text="Ready"/>
+      </DockPanel>
+    </Border>
+
+    <!-- Right column: collapsible windows / working / media -->
+    <!-- Lifted side panel: shadow on an empty sibling that tracks SidePanel Visibility/Margin
+         (code collapses SidePanel via Width/Margin/Visibility; wrapper sizes to it). -->
+    <Grid x:Name="SidePanelHost" DockPanel.Dock="Right">
+    <Border IsHitTestVisible="False" CornerRadius="6" Background="{DynamicResource PanelBrush}"
+            Effect="{DynamicResource PanelShadowEffect}"
+            Visibility="{Binding Visibility, ElementName=SidePanel}"
+            Margin="{Binding Margin, ElementName=SidePanel}"/>
+    <Border x:Name="SidePanel" Width="300" Margin="6,0,0,0"
+            Background="{DynamicResource PanelBrush}" CornerRadius="6"
+            BorderBrush="{DynamicResource TrayEdgeBrush}" BorderThickness="1" Padding="8">
+      <DockPanel>
+        <ContentControl DockPanel.Dock="Top" Style="{StaticResource SectionHeaderStrip}" Margin="-8,-8,-8,6">
+          <TextBlock Text="Link Window (click / drag / double-click move)" TextTrimming="CharacterEllipsis"/>
+        </ContentControl>
+        <Grid x:Name="PaneButtons" DockPanel.Dock="Top" Margin="0,0,0,4" MinHeight="26"/>
+
+        <Border x:Name="UnlinkDropZone" DockPanel.Dock="Top" Margin="0,0,0,8" Padding="8,10"
+                Background="{DynamicResource PanelAltBrush}" CornerRadius="6"
+                BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1"
+                AllowDrop="True" DragOver="UnlinkZone_DragOver" DragLeave="UnlinkZone_DragLeave" Drop="UnlinkZone_Drop"
+                Cursor="Hand" ToolTip="Drop a window here (or use Unlink) to return it to the desktop">
+          <TextBlock Text="Unlink / Desktop  (drop here)"
+                     FontSize="11" FontWeight="Bold"
+                     Foreground="{DynamicResource TextBrush}" HorizontalAlignment="Center"
+                     IsHitTestVisible="False"/>
+        </Border>
+
+        <!-- v1.0.2 Media section: live preview of the SMTC source window (DWM thumbnail) above the
+             now-playing label + controls. Height of the preview is set in code (MainWindow.MediaPreview.cs):
+             16:9 of the card's inner width, capped at 28 % of the side panel height. MaxHeight of the card
+             is preview + 250. Chevron collapses preview + session list. -->
+        <Border x:Name="MediaCard" DockPanel.Dock="Bottom" Background="{DynamicResource PanelAltBrush}"
+                CornerRadius="6" BorderBrush="{DynamicResource PanelEdgeBrush}" BorderThickness="1"
+                Padding="8" Margin="0,8,0,0" MaxHeight="230">
+          <DockPanel>
+            <ContentControl DockPanel.Dock="Top" Style="{StaticResource SectionHeaderStrip}" Margin="-8,-8,-8,6">
+              <DockPanel x:Name="MediaHeaderDock" LastChildFill="True" SizeChanged="MediaHeaderDock_SizeChanged">
+                <ToggleButton x:Name="TbMediaCollapse" DockPanel.Dock="Right" Click="TbMediaCollapse_Click"
+                              Focusable="False" Cursor="Hand" Margin="4,-3,-4,-3" Padding="4,0"
+                              ToolTip="Hide / show the media preview (saved)">
+                  <ToggleButton.Template>
+                    <ControlTemplate TargetType="ToggleButton">
+                      <Border x:Name="bd" Background="Transparent" CornerRadius="3" Padding="{TemplateBinding Padding}">
+                        <TextBlock x:Name="glyph" Text="&#xE70D;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontWeight="Normal"
+                                   FontSize="10" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource MutedTextBrush}"/>
+                      </Border>
+                      <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                          <Setter TargetName="glyph" Property="Text" Value="&#xE76C;"/>
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                          <Setter TargetName="glyph" Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+                        </Trigger>
+                      </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                  </ToggleButton.Template>
+                </ToggleButton>
+                <!-- v1.0.2 lock: padlock (open = auto-follow, closed = locked onto the current source). Vector paths in
+                     a 12x12 box, pixel-snapped, so it stays crisp at any DPI; colors follow the theme brushes. -->
+                <ToggleButton x:Name="TbMediaPin" DockPanel.Dock="Right" Click="TbMediaPin_Click"
+                              Focusable="False" Cursor="Hand" Margin="4,-3,0,-3" Padding="4,0"
+                              AutomationProperties.Name="Lock media source"
+                              ToolTip="Lock onto this media source: nothing else takes over until you unlock it or it closes">
+                  <ToggleButton.Template>
+                    <ControlTemplate TargetType="ToggleButton">
+                      <Border x:Name="bd" Background="Transparent" CornerRadius="3" Padding="{TemplateBinding Padding}"
+                              SnapsToDevicePixels="True" UseLayoutRounding="True">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Grid Width="12" Height="12" VerticalAlignment="Center">
+                          <Path x:Name="shOpen" StrokeThickness="1.4" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                Stroke="{DynamicResource MutedTextBrush}"
+                                Data="M8.25,6 V3.25 A2.25,2.25 0 0 0 3.75,3.25 V3.6"/>
+                          <Path x:Name="shClosed" StrokeThickness="1.4" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                Stroke="{DynamicResource MutedTextBrush}" Visibility="Collapsed"
+                                Data="M3.75,6 V4.25 A2.25,2.25 0 0 1 8.25,4.25 V6"/>
+                          <Path x:Name="body" Fill="{DynamicResource MutedTextBrush}"
+                                Data="M3,5.5 H9 A1,1 0 0 1 10,6.5 V10 A1,1 0 0 1 9,11 H3 A1,1 0 0 1 2,10 V6.5 A1,1 0 0 1 3,5.5 Z
+                                      M6,7.1 A0.85,0.85 0 0 0 5.4,8.55 V9.4 H6.6 V8.55 A0.85,0.85 0 0 0 6,7.1 Z"/>
+                        </Grid>
+                        <!-- state text; hidden in code below a header width threshold (icon stays) -->
+                        <TextBlock x:Name="lbl" Text="Unlocked" FontSize="10" FontWeight="SemiBold" Margin="3,0,0,0"
+                                   VerticalAlignment="Center" Foreground="{DynamicResource MutedTextBrush}"
+                                   TextOptions.TextFormattingMode="Display"/>
+                        </StackPanel>
+                      </Border>
+                      <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                          <Setter TargetName="shOpen" Property="Stroke" Value="{DynamicResource AccentBrush}"/>
+                          <Setter TargetName="shClosed" Property="Stroke" Value="{DynamicResource AccentBrush}"/>
+                          <Setter TargetName="body" Property="Fill" Value="{DynamicResource AccentBrush}"/>
+                          <Setter TargetName="lbl" Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                          <Setter TargetName="shOpen" Property="Visibility" Value="Collapsed"/>
+                          <Setter TargetName="shClosed" Property="Visibility" Value="Visible"/>
+                          <Setter TargetName="shClosed" Property="Stroke" Value="{DynamicResource AccentOnDimTextBrush}"/>
+                          <Setter TargetName="body" Property="Fill" Value="{DynamicResource AccentOnDimTextBrush}"/>
+                          <Setter TargetName="lbl" Property="Text" Value="Locked"/>
+                          <Setter TargetName="lbl" Property="Foreground" Value="{DynamicResource AccentOnDimTextBrush}"/>
+                          <Setter TargetName="bd" Property="Background" Value="{DynamicResource AccentDimBrush}"/>
+                        </Trigger>
+                      </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                  </ToggleButton.Template>
+                </ToggleButton>
+                <!-- v1.0.2 preview mode: live window preview vs. title card. Auto (default): title card while the playing
+                     window is itself visible (foreground / linked pane), 2 s debounce. A click forces the other mode and
+                     sticks; right-click: Return to auto / Auto title card setting. -->
+                <ToggleButton x:Name="TbMediaLive" DockPanel.Dock="Right" Click="TbMediaLive_Click"
+                              Focusable="False" Cursor="Hand" Margin="4,-3,0,-3" Padding="4,0"
+                              AutomationProperties.Name="Show title card"
+                              ToolTip="Live preview / title card (right-click: auto)">
+                  <ToggleButton.ContextMenu>
+                    <ContextMenu Opened="MediaHeaderMenu_Opened">
+                      <MenuItem x:Name="MiTitleCardReturnAuto" Header="Return to auto" Visibility="Collapsed"
+                                Click="MiTitleCardReturnAuto_Click"/>
+                      <MenuItem x:Name="MiAutoTitleCard" Header="Auto title card while the player window is visible"
+                                IsCheckable="True" Click="MiAutoTitleCard_Click"/>
+                    </ContextMenu>
+                  </ToggleButton.ContextMenu>
+                  <ToggleButton.Template>
+                    <ControlTemplate TargetType="ToggleButton">
+                      <Border x:Name="bd" Background="Transparent" CornerRadius="3" Padding="{TemplateBinding Padding}"
+                              SnapsToDevicePixels="True" UseLayoutRounding="True">
+                        <Grid Width="13" Height="12" VerticalAlignment="Center">
+                          <!-- screen outline -->
+                          <Path x:Name="scr" StrokeThickness="1.2" Stroke="{DynamicResource MutedTextBrush}"
+                                Data="M1.6,1.6 H11.4 A0.9,0.9 0 0 1 12.3,2.5 V8.5 A0.9,0.9 0 0 1 11.4,9.4 H1.6 A0.9,0.9 0 0 1 0.7,8.5 V2.5 A0.9,0.9 0 0 1 1.6,1.6 Z M4.5,11.3 H8.5"/>
+                          <!-- live: play triangle -->
+                          <Path x:Name="play" Fill="{DynamicResource MutedTextBrush}" Data="M5.2,3.6 L8.6,5.5 L5.2,7.4 Z"/>
+                          <!-- title card: text lines -->
+                          <Path x:Name="lines" Visibility="Collapsed" StrokeThickness="1.2" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                Stroke="{DynamicResource MutedTextBrush}" Data="M3,4.1 H10 M3,6.9 H7.6"/>
+                        </Grid>
+                      </Border>
+                      <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                          <Setter TargetName="scr" Property="Stroke" Value="{DynamicResource AccentBrush}"/>
+                          <Setter TargetName="play" Property="Fill" Value="{DynamicResource AccentBrush}"/>
+                          <Setter TargetName="lines" Property="Stroke" Value="{DynamicResource AccentBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                          <Setter TargetName="play" Property="Visibility" Value="Collapsed"/>
+                          <Setter TargetName="lines" Property="Visibility" Value="Visible"/>
+                          <Setter TargetName="scr" Property="Stroke" Value="{DynamicResource AccentOnDimTextBrush}"/>
+                          <Setter TargetName="lines" Property="Stroke" Value="{DynamicResource AccentOnDimTextBrush}"/>
+                          <Setter TargetName="bd" Property="Background" Value="{DynamicResource AccentDimBrush}"/>
+                        </Trigger>
+                      </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                  </ToggleButton.Template>
+                </ToggleButton>
+                <TextBlock Text="Media" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+              </DockPanel>
+            </ContentControl>
+            <!-- v1.0.2 source switcher (2+ SMTC sessions): its own row above the slot, never padding inside it. -->
+            <DockPanel x:Name="MediaSwitcher" DockPanel.Dock="Top" Margin="0,0,0,4" Height="20" Visibility="Collapsed"
+                       LastChildFill="True">
+              <Button x:Name="BtnMediaSrcPrev" DockPanel.Dock="Left" Click="BtnMediaSrcPrev_Click" Padding="5,0"
+                      FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontWeight="Normal" FontSize="9" Content="&#xE76B;"
+                      ToolTip="Previous media source (also locks it)"/>
+              <Button x:Name="BtnMediaSrcNext" DockPanel.Dock="Right" Click="BtnMediaSrcNext_Click" Padding="5,0"
+                      FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontWeight="Normal" FontSize="9" Content="&#xE76C;"
+                      ToolTip="Next media source (also locks it)"/>
+              <TextBlock x:Name="TxtMediaSrc" Margin="6,0" VerticalAlignment="Center" FontSize="10"
+                         TextTrimming="CharacterEllipsis" Foreground="{DynamicResource MutedTextBrush}"/>
+            </DockPanel>
+            <!-- Recessed "screen": dark line top/left, light line bottom/right (one line per edge). -->
+            <Border x:Name="MediaPreviewFrame" DockPanel.Dock="Top" Margin="0,0,0,6" Visibility="Collapsed"
+                    BorderThickness="1,1,0,0" BorderBrush="{DynamicResource TrayShadowBrush}" CornerRadius="3"
+                    Cursor="Hand" MouseLeftButtonUp="MediaPreview_Click"
+                    ToolTip="Click: bring this window forward. Right-click: link it to a pane.">
+              <Border BorderThickness="0,0,1,1" BorderBrush="{DynamicResource TrayHighlightBrush}" CornerRadius="3"
+                      Background="#FF050505">
+                <Border.ContextMenu>
+                  <ContextMenu x:Name="MediaPreviewMenu" Opened="MediaPreviewMenu_Opened"/>
+                </Border.ContextMenu>
+                <Grid x:Name="MediaPreviewGrid" Height="140" ClipToBounds="True">
+                  <Image x:Name="MediaPreviewArt" Stretch="UniformToFill" Visibility="Collapsed"
+                         HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                  <TextBlock x:Name="MediaPreviewCard" Visibility="Collapsed" Margin="8,0,8,20"
+                             VerticalAlignment="Center" HorizontalAlignment="Center" TextAlignment="Center"
+                             TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="60"
+                             FontSize="12" FontWeight="Bold" Foreground="{DynamicResource TextBrush}"/>
+                  <TextBlock x:Name="MediaPreviewNote" Visibility="Collapsed" VerticalAlignment="Bottom"
+                             HorizontalAlignment="Stretch" TextAlignment="Center" Padding="4,2,4,3" FontSize="10"
+                             TextTrimming="CharacterEllipsis" Background="#B0000000" Foreground="#FFE8E8E8"/>
+                  <local:ThumbnailHost x:Name="MediaPreviewThumb" MinHeight="1" MinWidth="1"/>
+                </Grid>
+              </Border>
+            </Border>
+            <Border x:Name="MediaNothingStrip" DockPanel.Dock="Top" Margin="0,0,0,6" Height="20"
+                    BorderThickness="1,1,0,0" BorderBrush="{DynamicResource TrayShadowBrush}" CornerRadius="3">
+              <Border BorderThickness="0,0,1,1" BorderBrush="{DynamicResource TrayHighlightBrush}" CornerRadius="3">
+                <TextBlock Text="Nothing playing" FontSize="10" HorizontalAlignment="Center" VerticalAlignment="Center"
+                           Foreground="{DynamicResource MutedTextBrush}"/>
+              </Border>
+            </Border>
+            <DockPanel x:Name="MediaNowPlayingRow" DockPanel.Dock="Top" Margin="0,0,0,6" LastChildFill="True">
+              <Image x:Name="ImgMediaNow" DockPanel.Dock="Left" Width="16" Height="16"
+                     Margin="0,0,6,0" Stretch="Uniform" SnapsToDevicePixels="True"/>
+              <TextBlock x:Name="TxtMediaNow" FontSize="11" TextTrimming="CharacterEllipsis"
+                         VerticalAlignment="Center" Foreground="{DynamicResource MutedTextBrush}"
+                         Text="No media window"/>
+            </DockPanel>
+            <StackPanel DockPanel.Dock="Top" Margin="0,0,0,6">
+              <!-- Upper row restored: [Play/Pause][volume *][Prev][Next]. Seek ±10s lives on the Auto-skip row. -->
+              <Grid x:Name="MediaControlsRow" Margin="0,0,0,4">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto"/>
+                  <ColumnDefinition Width="*" MinWidth="50" MaxWidth="160"/>
+                  <ColumnDefinition Width="Auto"/>
+                  <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Button x:Name="BtnMediaPlayPause" Grid.Column="0" Content="Play/Pause" Click="BtnMediaPlayPause_Click"
+                        Padding="6,3" FontSize="11" Margin="0,0,4,0"
+                        ToolTip="Play/Pause active media session (GSMTC)"/>
+                <!-- Volume slider (replaces Vol + / Vol -): default output endpoint, synced from the device.
+                     Level number sits tight on the right; hidden (tooltip only) when the column is narrow. -->
+                <DockPanel x:Name="MediaVolumeHost" Grid.Column="1" Margin="0,0,4,0" LastChildFill="True"
+                           SizeChanged="MediaVolumeHost_SizeChanged">
+                  <TextBlock x:Name="TxtMediaVolume" DockPanel.Dock="Right" MinWidth="16" Margin="2,0,0,0" FontSize="10"
+                             VerticalAlignment="Center" TextAlignment="Right" Text="--"
+                             Foreground="{DynamicResource MutedTextBrush}"/>
+                  <Slider x:Name="SldMediaVolume" MinWidth="34" Minimum="0" Maximum="100"
+                          SmallChange="2" LargeChange="10" IsMoveToPointEnabled="True" Focusable="False"
+                          VerticalAlignment="Stretch" Cursor="Hand" ToolTip="Volume (drag, click, or scroll)"
+                          ValueChanged="SldMediaVolume_ValueChanged"
+                          PreviewMouseWheel="SldMediaVolume_PreviewMouseWheel">
+                    <Slider.Template>
+                      <ControlTemplate TargetType="Slider">
+                        <Grid Background="Transparent">
+                          <Border Height="4" CornerRadius="2" VerticalAlignment="Center" Margin="5,0"
+                                  Background="{DynamicResource PanelAltBrush}"
+                                  BorderBrush="{DynamicResource BorderBrushQuiet}" BorderThickness="1"/>
+                          <Track x:Name="PART_Track" Margin="0">
+                            <Track.DecreaseRepeatButton>
+                              <RepeatButton Command="Slider.DecreaseLarge" Focusable="False">
+                                <RepeatButton.Template>
+                                  <ControlTemplate TargetType="RepeatButton">
+                                    <Grid Background="Transparent">
+                                      <Border Height="4" CornerRadius="2" VerticalAlignment="Center" Margin="5,0,0,0"
+                                              Background="{DynamicResource AccentBrush}"/>
+                                    </Grid>
+                                  </ControlTemplate>
+                                </RepeatButton.Template>
+                              </RepeatButton>
+                            </Track.DecreaseRepeatButton>
+                            <Track.IncreaseRepeatButton>
+                              <RepeatButton Command="Slider.IncreaseLarge" Focusable="False">
+                                <RepeatButton.Template>
+                                  <ControlTemplate TargetType="RepeatButton">
+                                    <Border Background="Transparent"/>
+                                  </ControlTemplate>
+                                </RepeatButton.Template>
+                              </RepeatButton>
+                            </Track.IncreaseRepeatButton>
+                            <Track.Thumb>
+                              <Thumb Width="10" Height="10" Focusable="False">
+                                <Thumb.Template>
+                                  <ControlTemplate TargetType="Thumb">
+                                    <Ellipse Fill="{DynamicResource AccentBrush}"
+                                             Stroke="{DynamicResource PanelBrush}" StrokeThickness="1"/>
+                                  </ControlTemplate>
+                                </Thumb.Template>
+                              </Thumb>
+                            </Track.Thumb>
+                          </Track>
+                        </Grid>
+                      </ControlTemplate>
+                    </Slider.Template>
+                  </Slider>
+                </DockPanel>
+                <Button x:Name="BtnMediaPrev" Grid.Column="2" Content="Prev" Click="BtnMediaPrev_Click"
+                        Padding="6,3" FontSize="11" Margin="0,0,4,0"
+                        ToolTip="Previous track (GSMTC active session)"/>
+                <Button x:Name="BtnMediaNext" Grid.Column="3" Content="Next" Click="BtnMediaNext_Click"
+                        Padding="6,3" FontSize="11" Margin="0"
+                        ToolTip="Next track (GSMTC active session)"/>
+              </Grid>
+              <!-- Lower row: Auto-skip + On, then −10s/+10s. WrapPanel avoids clipping when the panel is narrow. -->
+              <WrapPanel Orientation="Horizontal">
+                <Button x:Name="BtnMediaSkipAd" Content="Auto-skip ads" Click="BtnMediaSkipAd_Click"
+                        Padding="8,3" FontSize="11" Margin="0,0,4,0"
+                        ToolTip="Click or press F8 (F9 if F8 is taken) to skip the YouTube ad now. Pulses when YouTube's Skip button is up."/>
+                <ToggleButton x:Name="TbAutoSkip" Content="On" Style="{StaticResource QuietToggle}" Click="TbAutoSkip_Click"
+                              Padding="8,3" FontSize="11" Margin="0,0,4,0" IsChecked="True"
+                              ToolTip="Auto-skip On/Off: press YouTube's Skip button automatically as soon as it appears (saved)"/>
+                <Button x:Name="BtnMediaRewind10" Content="−10s" Click="BtnMediaRewind10_Click"
+                        Padding="6,3" FontSize="11" Margin="0,0,4,0"
+                        ToolTip="Rewind 10 seconds on the selected media source"
+                        AutomationProperties.Name="Rewind 10 seconds"/>
+                <Button x:Name="BtnMediaForward10" Content="+10s" Click="BtnMediaForward10_Click"
+                        Padding="6,3" FontSize="11" Margin="0"
+                        ToolTip="Forward 10 seconds on the selected media source"
+                        AutomationProperties.Name="Forward 10 seconds"/>
+              </WrapPanel>
+            </StackPanel>
+            <TextBlock DockPanel.Dock="Bottom" FontSize="10"
+                       Foreground="{DynamicResource MutedTextBrush}" Margin="0,4,0,0"
+                       Text="Ctrl+Shift+M mute - F focus - D full screen"/>
+            <ScrollViewer x:Name="MediaListScroll" VerticalScrollBarVisibility="Auto" Background="Transparent">
+              <ItemsControl x:Name="MediaList">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <DockPanel Margin="0,0,0,4">
+                      <Button DockPanel.Dock="Right" Content="{Binding MuteLabel}"
+                              Padding="8,3" FontSize="11" Margin="6,0,0,0"
+                              Click="BtnMediaMute_Click" Tag="{Binding}"/>
+                      <TextBlock Text="{Binding Label}" FontSize="12"
+                                 VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                                 Foreground="{DynamicResource TextBrush}"
+                                 ToolTip="{Binding ProcessName}"/>
+                    </DockPanel>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
+          </DockPanel>
+        </Border>
+
+        <!-- Unified Windows + Docs with separate scroll areas -->
+        <!-- v1.0.2 split: Windows and Docs share what Media leaves (equal stars). Docs keeps >= 170, so when
+             space runs out the Windows list shrinks (and scrolls) down to 90 first. -->
+        <Grid MinHeight="266">
+          <Grid.RowDefinitions>
+            <RowDefinition Height="*" MinHeight="90"/>
+            <RowDefinition Height="6"/>
+            <RowDefinition Height="*" MinHeight="170"/>
+          </Grid.RowDefinitions>
+
+          <Border Grid.Row="0" Background="{DynamicResource PanelAltBrush}"
+                  CornerRadius="6" BorderBrush="{DynamicResource PanelEdgeBrush}" BorderThickness="1"
+                  Padding="6">
+            <DockPanel x:Name="WindowsPanel">
+              <ContentControl DockPanel.Dock="Top" Style="{StaticResource SectionHeaderStrip}" Margin="-6,-6,-6,6">
+                <TextBlock Text="Windows (link / drag to pane / click = assign)" TextTrimming="CharacterEllipsis"/>
+              </ContentControl>
+              <ListBox x:Name="WindowList"
+                       Background="Transparent"
+                       BorderThickness="0"
+                       ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                       ScrollViewer.VerticalScrollBarVisibility="Auto"
+                       MouseDoubleClick="WindowList_MouseDoubleClick"
+                       PreviewMouseLeftButtonDown="WindowList_PreviewMouseLeftButtonDown"
+                       PreviewMouseMove="WindowList_PreviewMouseMove"
+                       PreviewMouseLeftButtonUp="WindowList_PreviewMouseLeftButtonUp"
+                       ToolTip="Link toggle assigns/Unlinks. Click row: center + assign menu. Drag onto a pane chip to move.">
+                <ListBox.ItemContainerStyle>
+                  <Style TargetType="ListBoxItem">
+                    <Setter Property="Padding" Value="6,5"/>
+                    <Setter Property="Margin" Value="0,0,0,2"/>
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                    <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+                    <Setter Property="Template">
+                      <Setter.Value>
+                        <ControlTemplate TargetType="ListBoxItem">
+                          <Border x:Name="bd" Background="Transparent" CornerRadius="4"
+                                  Padding="{TemplateBinding Padding}"
+                                  TextElement.Foreground="{TemplateBinding Foreground}">
+                            <ContentPresenter/>
+                          </Border>
+                          <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                              <Setter TargetName="bd" Property="Background" Value="{DynamicResource PanelBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                              <Setter TargetName="bd" Property="Background" Value="{DynamicResource AccentDimBrush}"/>
+                              <Setter Property="Foreground" Value="{DynamicResource AccentOnDimTextBrush}"/>
+                            </Trigger>
+                          </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                      </Setter.Value>
+                    </Setter>
+                  </Style>
+                </ListBox.ItemContainerStyle>
+                <ListBox.ItemTemplate>
+                  <DataTemplate>
+                    <DockPanel>
+                      <local:InvokableBorder DockPanel.Dock="Left" MinWidth="64" Height="20" CornerRadius="4"
+                              Style="{StaticResource GlowChipBorder}"
+                              Margin="0,0,8,0" Padding="6,0" VerticalAlignment="Center" Cursor="Hand"
+                              Background="{Binding LinkBrush}"
+                              ToolTip="{Binding LinkTooltip}"
+                              AutomationProperties.Name="{Binding ShortTitle, StringFormat=Link toggle: {0}}"
+                              Tag="{Binding}"
+                              Invoked="LinkChip_Invoked"
+                              MouseLeftButtonDown="LinkToggle_PreviewMouseLeftButtonDown"
+                              MouseLeftButtonUp="LinkToggle_Click">
+                        <TextBlock Text="{Binding LinkLabel}" FontSize="10" FontWeight="Bold"
+                                   Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center"
+                                   HorizontalAlignment="Center"/>
+                      </local:InvokableBorder>
+                      <Image DockPanel.Dock="Left" Width="16" Height="16" Margin="0,0,8,0"
+                             Source="{Binding Icon}" Stretch="Uniform"/>
+                      <TextBlock DockPanel.Dock="Right" Text="&#9835;" FontSize="12" FontWeight="Bold" Margin="6,0,0,0"
+                                 VerticalAlignment="Center" Foreground="{DynamicResource SuccessBrush}"
+                                 Visibility="{Binding NowPlayingVisibility}"
+                                 ToolTip="Now playing"/>
+                      <TextBlock Text="{Binding ShortTitle}" FontSize="12"
+                                 TextTrimming="CharacterEllipsis"
+                                 ToolTip="{Binding FullTooltip}"/>
+                    </DockPanel>
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+            </DockPanel>
+          </Border>
+
+          <GridSplitter Grid.Row="1" Height="6" HorizontalAlignment="Stretch"
+                        Background="{DynamicResource PanelBrush}" ShowsPreview="True"/>
+
+          <Border Grid.Row="2" x:Name="DocsPanel" Visibility="Visible"
+                  Background="{DynamicResource PanelAltBrush}"
+                  CornerRadius="6" BorderBrush="{DynamicResource PanelEdgeBrush}" BorderThickness="1"
+                  Padding="6" AllowDrop="True" Focusable="True"
+                  PreviewKeyDown="DocsPanel_PreviewKeyDown" PreviewMouseDown="DocsPanel_PreviewMouseDown"
+                  DragOver="DocsPanel_DragOver" DragLeave="DocsPanel_DragLeave" Drop="DocsPanel_Drop">
+            <DockPanel>
+              <ContentControl DockPanel.Dock="Top" Style="{StaticResource SectionHeaderStrip}" Margin="-6,-6,-6,4">
+                <TextBlock Text="Docs (Files / Paste / drop · drag onto a pane)" TextTrimming="CharacterEllipsis"/>
+              </ContentControl>
+              <TextBlock x:Name="TxtDocsPath" DockPanel.Dock="Top" FontSize="10"
+                         Foreground="{DynamicResource MutedTextBrush}" TextTrimming="CharacterEllipsis"
+                         Margin="0,0,0,4" ToolTip="Current folder"/>
+              <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,6">
+                <Button x:Name="BtnDocsFiles" local:KeyCap.Lit="True" local:KeyCap.Recessed="True" Content="Files" Click="BtnDocsHome_Click" Padding="10,5" FontSize="12" FontWeight="Bold" Margin="0,0,6,4"
+                        Background="{DynamicResource AccentBrush}" Foreground="{DynamicResource AccentTextBrush}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1"
+                        ToolTip="DeskPad home — staging files (paste / drop / Latest)."/>
+                <Button Content="Latest" Click="BtnDocsLatestDownload_Click" Padding="8,5" FontSize="11" Margin="0,0,6,4"
+                        Background="{DynamicResource PanelBrush}" Foreground="{DynamicResource MutedTextBrush}" BorderBrush="{DynamicResource BorderBrushQuiet}" BorderThickness="1"
+                        ToolTip="Newest download into DeskPad"/>
+                <Button x:Name="BtnDocsDownloads" local:KeyCap.Recessed="True" Content="Downloads" Click="BtnDocsDownloads_Click" Padding="8,5" FontSize="11" Margin="0,0,6,4"
+                        Background="{DynamicResource PanelBrush}" Foreground="{DynamicResource MutedTextBrush}" BorderBrush="{DynamicResource BorderBrushQuiet}" BorderThickness="1"
+                        ToolTip="Temporary browse of Downloads (does not copy into DeskPad)"/>
+                <Button x:Name="BtnDocsDesktop" local:KeyCap.Recessed="True" Content="Desktop" Click="BtnDocsDesktop_Click" Padding="8,5" FontSize="11" Margin="0,0,6,4"
+                        Background="{DynamicResource PanelBrush}" Foreground="{DynamicResource MutedTextBrush}" BorderBrush="{DynamicResource BorderBrushQuiet}" BorderThickness="1"
+                        ToolTip="Temporary browse of Desktop (does not copy into DeskPad)"/>
+                <Button Content="Paste" Click="BtnDocsPaste_Click" Padding="8,5" FontSize="11" Margin="0,0,6,4"
+                        Background="{DynamicResource PanelBrush}" Foreground="{DynamicResource MutedTextBrush}" BorderBrush="{DynamicResource BorderBrushQuiet}" BorderThickness="1"
+                        ToolTip="Paste clipboard image/files/URL (Ctrl+V)"/>
+                <Button Content="Clear" Click="BtnDocsClear_Click" Padding="8,5" FontSize="11" Margin="0,0,6,4"
+                        Background="{DynamicResource PanelBrush}" Foreground="{DynamicResource MutedTextBrush}" BorderBrush="{DynamicResource BorderBrushQuiet}" BorderThickness="1"
+                        ToolTip="Empty DeskPad staging"/>
+              </WrapPanel>
+              <Border x:Name="DocsDropHint" Visibility="Collapsed" DockPanel.Dock="Top" Margin="0,0,0,6"
+                      Padding="8,6" Background="{DynamicResource AccentDimBrush}" CornerRadius="4" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1">
+                <TextBlock Text="Drop files, or drag an image/gif/video from a website" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" HorizontalAlignment="Center"/>
+              </Border>
+              <ListBox x:Name="DocsList" Background="Transparent" BorderThickness="0"
+                       ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                       ScrollViewer.VerticalScrollBarVisibility="Auto"
+                       MouseDoubleClick="DocsList_MouseDoubleClick"
+                       PreviewMouseLeftButtonDown="DocsList_PreviewMouseLeftButtonDown"
+                       PreviewMouseLeftButtonUp="DocsList_PreviewMouseLeftButtonUp"
+                       PreviewMouseMove="DocsList_PreviewMouseMove"
+                       ToolTip="Drag onto a pane or desktop. Double-click to open.">
+                <ListBox.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <WrapPanel Orientation="Horizontal"/>
+                  </ItemsPanelTemplate>
+                </ListBox.ItemsPanel>
+                <ListBox.ItemTemplate>
+                  <DataTemplate>
+                    <StackPanel Width="60" Margin="0,0,5,6" HorizontalAlignment="Center">
+                      <Border Width="40" Height="40" HorizontalAlignment="Center" CornerRadius="4"
+                              Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource BorderBrushQuiet}" BorderThickness="1">
+                        <Image Source="{Binding Thumb}" Stretch="Uniform"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                      </Border>
+                      <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="Bold"
+                                 TextAlignment="Center" TextWrapping="Wrap" MaxHeight="28"
+                                 TextTrimming="CharacterEllipsis" Margin="0,3,0,0"
+                                 Foreground="{DynamicResource TextBrush}"
+                                 ToolTip="{Binding FullPath}"/>
+                      <TextBlock Text="{Binding Meta}" FontSize="10" TextAlignment="Center"
+                                 Foreground="{DynamicResource MutedTextBrush}" Margin="0,2,0,2"/>
+                      <Button Content="Remove" Padding="6,2" FontSize="10" HorizontalAlignment="Center"
+                              Tag="{Binding FullPath}" Click="BtnDocsRemoveItem_Click"/>
+                    </StackPanel>
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+            </DockPanel>
+          </Border>
+        </Grid>
+      </DockPanel>
+    </Border>
+    </Grid>
+
+    <!-- Contained panes (desk) -->
+    <Border x:Name="DeskChrome" Background="{DynamicResource DeskGradientBrush}" CornerRadius="6"
+            BorderBrush="Transparent" BorderThickness="1" Padding="2">
+      <DockPanel>
+        <DockPanel x:Name="DeskCaptionRow" DockPanel.Dock="Top" Margin="0" Visibility="Collapsed">
+          <TextBlock Text="Desk"
+                     FontSize="11" FontWeight="Bold"
+                     Foreground="{DynamicResource MutedTextBrush}"
+                     VerticalAlignment="Center"/>
+          <TextBlock x:Name="DeskHint" Text="  -  Live desk - real windows tiled to panes"
+                     FontSize="11" Foreground="{DynamicResource MutedTextBrush}"
+                     VerticalAlignment="Center"/>
+        </DockPanel>
+        <!-- PaneGrid keeps its exact slot; TrayBevel only paints 1px depth lines on/beside the pane outlines. -->
+        <Grid>
+          <Grid x:Name="PaneGrid"/>
+          <local:TrayBevelOverlay x:Name="TrayBevel" Panel.ZIndex="1"/>
+        </Grid>
+      </DockPanel>
+    </Border>
+  </DockPanel>
+
+  <!-- Fallback restore control (Live desk uses a Topmost overlay so it is not buried) -->
+  <Button x:Name="BtnShowUi" Grid.Row="1" Content="Show UI" Click="BtnShowUi_Click"
+          HorizontalAlignment="Right" VerticalAlignment="Top"
+          Margin="0,6,6,0" Padding="10,4" FontSize="11"
+          Background="{DynamicResource AccentDimBrush}" Foreground="{DynamicResource AccentOnDimTextBrush}" BorderBrush="{DynamicResource AccentBrush}"
+          ToolTip="Exit full screen - restore header + side panel (Esc / Ctrl+Shift+D)"
+          Visibility="Collapsed" Panel.ZIndex="50"/>
+  </Grid>
+</Window>

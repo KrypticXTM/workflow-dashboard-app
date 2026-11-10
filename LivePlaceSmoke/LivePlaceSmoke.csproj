@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <RootNamespace>WorkflowDashboard</RootNamespace>
+    <AssemblyName>LivePlaceSmoke</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\WorkflowDashboard\NativeMethods.cs" Link="NativeMethods.cs" />
+    <Compile Include="..\WorkflowDashboard\ZoneLayout.cs" Link="ZoneLayout.cs" />
+  </ItemGroup>
+</Project>
